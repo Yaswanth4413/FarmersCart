@@ -1,0 +1,206 @@
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  signOut
+} from 'firebase/auth';
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp
+} from 'firebase/firestore';
+
+const firebaseConfig = {
+  apiKey: 'AIzaSyCxvEzfNGH9QIfzkgcqHo2e8b3k28b4lVc',
+  authDomain: 'digital-catalog.firebaseapp.com',
+  projectId: 'digital-catalog',
+  storageBucket: 'digital-catalog.appspot.com',
+  messagingSenderId: '132413889004',
+  appId: '1:132413889004:web:3e09df8ffcecf81dca3d83'
+};
+
+let app, auth, db;
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (e) {
+  console.error("Firebase initialization error:", e);
+}
+
+const FarmerCartApp = () => {
+  const [user, setUser] = useState(null);
+  const [theme, setTheme] = useState('light');
+  const [view, setView] = useState('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [signupError, setSignupError] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [products, setProducts] = useState([]);
+  const [logs, setLogs] = useState([]);
+
+  const [product, setProduct] = useState({
+    name: '', price: '', category: '', stock: '', description: ''
+  });
+
+  useEffect(() => {
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUser(user);
+        setView('dashboard');
+      } else {
+        setUser(null);
+        setView('login');
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      const unsubProducts = onSnapshot(collection(db, 'products'), (snap) => {
+        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setProducts(data);
+      });
+      const logQuery = query(collection(db, 'loginLogs'), orderBy('timestamp', 'desc'));
+      const unsubLogs = onSnapshot(logQuery, (snap) => {
+        const data = snap.docs.map(doc => doc.data());
+        setLogs(data);
+      });
+      return () => { unsubProducts(); unsubLogs(); };
+    }
+  }, [user]);
+
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      if (!result.user.emailVerified) {
+        setLoginError('Please verify your email before logging in.');
+        await signOut(auth);
+        return;
+      }
+      await addDoc(collection(db, 'loginLogs'), { email, timestamp: serverTimestamp() });
+    } catch (err) {
+      setLoginError(err.message);
+    }
+  };
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(result.user);
+      setSignupError('Verification email sent. Check your inbox.');
+    } catch (err) {
+      setSignupError(err.message);
+    }
+  };
+
+  const addProduct = async (e) => {
+    e.preventDefault();
+    await addDoc(collection(db, 'products'), { ...product, createdAt: serverTimestamp() });
+    setProduct({ name: '', price: '', category: '', stock: '', description: '' });
+  };
+
+  return (
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-emerald-50'} font-sans`}>      
+      <div className="fixed inset-0 bg-cover bg-center blur-sm brightness-75 z-[-1] after:absolute after:inset-0 after:bg-black after:opacity-20" style={{ backgroundImage: `url('${view === 'dashboard' ? 'https://digital-catalog.web.app/dashboard-bg.jpg' : 'https://digital-catalog.web.app/farmer-family.jpg'}')` }}></div>
+      <div className="flex justify-end p-4">
+        <button onClick={toggleTheme} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 dark:bg-gray-800 dark:text-white">Toggle Theme</button>
+      </div>
+
+      <div className="text-center text-white mt-6 animate-fade-in">
+        <h1 className="text-4xl font-extrabold drop-shadow-lg">👨‍🌾 Welcome to Farmer Cart</h1>
+        <p className="text-lg mt-2 drop-shadow-sm">Empowering Farmers with Smart Tools</p>
+      </div>
+
+      <div className="max-w-4xl mx-auto p-6 animate-fade-in">
+        {view === 'login' && (
+          <form onSubmit={handleLogin} className="bg-white bg-opacity-90 backdrop-blur-md p-8 rounded-lg shadow-lg max-w-md mx-auto mt-10 space-y-4">
+            <h2 className="text-2xl font-bold text-green-700">🌾 Farmer Cart Login</h2>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className="w-full p-2 border rounded" required />
+            <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password" className="w-full p-2 border rounded" required />
+            {loginError && <p className="text-red-500 text-sm">{loginError}</p>}
+            <button className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">Login</button>
+            <p className="text-center text-sm mt-2">
+              <button onClick={() => setView('signup')} type="button" className="text-blue-600 hover:underline">Create an account</button>
+            </p>
+          </form>
+        )}
+
+        {view === 'signup' && (
+          <form onSubmit={handleSignup} className="bg-white bg-opacity-90 backdrop-blur-md p-8 rounded-lg shadow-lg max-w-md mx-auto mt-10 space-y-4">
+            <h2 className="text-2xl font-bold text-green-700">🌱 Create Account</h2>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" className="w-full p-2 border rounded" required />
+            <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password" className="w-full p-2 border rounded" required />
+            {signupError && <p className="text-red-500 text-sm">{signupError}</p>}
+            <button className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">Sign Up</button>
+            <p className="text-center text-sm mt-2">
+              <button onClick={() => setView('login')} type="button" className="text-blue-600 hover:underline">Back to login</button>
+            </p>
+          </form>
+        )}
+
+        {view === 'dashboard' && user && (
+          <div className="bg-white bg-opacity-90 backdrop-blur-md p-6 rounded shadow">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-green-700">🌾 Farmer Cart Dashboard</h2>
+              <button onClick={() => signOut(auth)} className="px-3 py-1 bg-red-500 text-white rounded">Logout</button>
+            </div>
+            <p className="mt-2 text-sm text-gray-500">Logged in as: {user.email}</p>
+            <hr className="my-4" />
+
+            <h3 className="text-lg font-semibold mb-2">Add Product</h3>
+            <form onSubmit={addProduct} className="grid grid-cols-2 gap-4 mb-6">
+              <input type="text" value={product.name} onChange={(e) => setProduct({ ...product, name: e.target.value })} placeholder="Name" className="p-2 border rounded" required />
+              <input type="text" value={product.price} onChange={(e) => setProduct({ ...product, price: e.target.value })} placeholder="Price" className="p-2 border rounded" required />
+              <input type="text" value={product.category} onChange={(e) => setProduct({ ...product, category: e.target.value })} placeholder="Category" className="p-2 border rounded" />
+              <input type="text" value={product.stock} onChange={(e) => setProduct({ ...product, stock: e.target.value })} placeholder="Stock" className="p-2 border rounded" />
+              <textarea value={product.description} onChange={(e) => setProduct({ ...product, description: e.target.value })} placeholder="Description" className="col-span-2 p-2 border rounded"></textarea>
+              <button type="submit" className="col-span-2 bg-green-600 text-white py-2 rounded hover:bg-green-700 transition-all duration-300 hover:scale-105">Add Product</button>
+            </form>
+
+            <h3 className="text-lg font-semibold mb-2">Products</h3>
+            <div className="grid gap-4 transition-all duration-300">
+              {products.map((p, i) => (
+                <div key={i} className="border p-3 rounded bg-gray-50 transform transition-transform duration-200 hover:scale-105 hover:shadow-md">
+                  <strong>{p.name}</strong><br />
+                  ₹{p.price} - {p.category || 'N/A'} ({p.stock || 'N/A'})<br />
+                  <small>{p.description}</small>
+                </div>
+              ))}
+            </div>
+
+            <h3 className="text-lg font-semibold mt-6 mb-2">Login Logs</h3>
+            <table className="w-full text-sm border">
+              <thead><tr className="bg-green-100"><th className="p-2">Email</th><th className="p-2">Timestamp</th></tr></thead>
+              <tbody>
+                {logs.map((log, i) => (
+                  <tr key={i} className="border-t">
+                    <td className="p-2">{log.email}</td>
+                    <td className="p-2">{(log.timestamp && typeof log.timestamp.toDate === 'function') ? log.timestamp.toDate().toLocaleString() : 'Pending'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default FarmerCartApp;
