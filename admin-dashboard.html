@@ -2,39 +2,34 @@
 <html>
 <head>
   <title>Admin Dashboard</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background-color: #f9f9f9;
-      text-align: center;
-      padding: 50px;
-    }
-    h1 {
-      color: #333;
-    }
-    button {
-      margin-top: 20px;
-      padding: 10px 20px;
-      background: #e74c3c;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-  </style>
 </head>
 <body>
-  <h1>Welcome, Admin <span id="adminName"></span>!</h1>
-  <p>This is your dashboard to manage catalog data, users, and stock alerts.</p>
-  <button onclick="logout()">Logout</button>
+  <h2>Welcome Admin</h2>
+  <form onsubmit="addProduct(); return false;">
+    <input id="pname" placeholder="Product Name" required /><br/>
+    <input id="pprice" type="number" step="0.01" placeholder="Price ₹" required /><br/>
+    <textarea id="pdesc" placeholder="Product Description" required></textarea><br/>
+    <button type="submit">Add Product</button>
+  </form>
 
   <script>
-    const name = localStorage.getItem('username');
-    document.getElementById('adminName').textContent = name || 'Admin';
+    function addProduct() {
+      const name = document.getElementById('pname').value;
+      const price = document.getElementById('pprice').value;
+      const description = document.getElementById('pdesc').value;
 
-    function logout() {
-      localStorage.clear();
-      window.location.href = 'index.html';
+      fetch('http://localhost:5000/admin/add-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, price, description })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message);
+        document.getElementById('pname').value = '';
+        document.getElementById('pprice').value = '';
+        document.getElementById('pdesc').value = '';
+      });
     }
   </script>
 </body>

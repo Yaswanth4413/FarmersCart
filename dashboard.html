@@ -1,97 +1,85 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>User Dashboard - FarmEase</title>
+  <title>User Dashboard</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: Arial;
       background: #f0fff4;
+      padding: 40px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 40px;
     }
-
-    .container {
-      background: white;
-      border-radius: 12px;
-      padding: 30px 40px;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    textarea, input {
       width: 100%;
       max-width: 500px;
-      text-align: center;
-    }
-
-    h2 {
-      color: #2f855a;
-    }
-
-    textarea {
-      width: 100%;
-      height: 100px;
-      margin-top: 15px;
-      font-size: 16px;
+      margin: 10px 0;
       padding: 10px;
-      border-radius: 6px;
       border: 1px solid #ccc;
-      resize: none;
+      border-radius: 6px;
+      font-size: 16px;
     }
-
     button {
-      margin-top: 20px;
       padding: 10px 20px;
+      margin-top: 10px;
+      font-size: 16px;
       background: #38a169;
       color: white;
       border: none;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 16px;
     }
-
-    .logout {
-      background: #e53e3e;
-      margin-top: 30px;
-    }
+    button:hover { background: #2f855a; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h2>Welcome, <span id="userName"></span>!</h2>
 
-    <h3>🎤 Speak Product Description</h3>
-    <button onclick="startVoice()">Record</button>
-    <textarea id="productDesc" placeholder="Your voice input will appear here..."></textarea>
+<h2>Welcome, <span id="username"></span></h2>
 
-    <button class="logout" onclick="logout()">Logout</button>
-  </div>
+<h3>🎤 Speak Product Description</h3>
+<textarea id="productDesc" placeholder="Click Start & speak..."></textarea>
+<button onclick="startVoice()">🎙️ Start Voice</button>
+<button onclick="processWithAI()">🤖 Generate AI Details</button>
 
-  <script>
-    const username = localStorage.getItem('username');
-    if (!username) {
-      alert('Please login first.');
-      window.location.href = 'index.html';
+<h4>📝 AI Description</h4>
+<textarea id="aiDescription"></textarea>
+
+<h4>📦 Suggested Category</h4>
+<input type="text" id="aiCategory" readonly>
+
+<h4>🌐 Hindi Translation</h4>
+<textarea id="aiTranslation" readonly></textarea>
+
+<script>
+  const username = localStorage.getItem("username");
+  document.getElementById("username").textContent = username;
+
+  function startVoice() {
+    const r = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    r.lang = 'en-IN';
+    r.start();
+    r.onresult = e => document.getElementById("productDesc").value = e.results[0][0].transcript;
+    r.onerror = e => alert("Voice error: " + e.error);
+  }
+
+  async function processWithAI() {
+    const input = document.getElementById("productDesc").value;
+    const res = await fetch("http://localhost:5000/ai-process", {
+      method: "POST",
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input })
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById("aiDescription").value = data.description;
+      document.getElementById("aiCategory").value = data.category;
+      document.getElementById("aiTranslation").value = data.translation;
+    } else {
+      alert("AI processing failed");
     }
-    document.getElementById('userName').textContent = username;
+  }
+</script>
 
-    function logout() {
-      localStorage.clear();
-      window.location.href = 'index.html';
-    }
-
-    function startVoice() {
-      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = 'en-IN';
-      recognition.start();
-
-      recognition.onresult = function(event) {
-        document.getElementById('productDesc').value = event.results[0][0].transcript;
-      };
-
-      recognition.onerror = function(err) {
-        alert('Voice recognition error: ' + err.error);
-      };
-    }
-  </script>
 </body>
 </html>

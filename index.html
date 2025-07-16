@@ -1,63 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Login Portal</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FarmEase Login</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(to right, #8e9eab, #eef2f3);
+      background: #f3f9f1;
       display: flex;
-      height: 100vh;
-      justify-content: center;
       align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
     }
-
     .box {
       background: white;
       padding: 40px;
-      border-radius: 8px;
+      border-radius: 12px;
+      width: 340px;
       box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-      width: 300px;
     }
-
-    h2 {
-      text-align: center;
-    }
-
     input, select {
       width: 100%;
+      margin: 10px 0;
       padding: 10px;
-      margin: 12px 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
       font-size: 16px;
-      caret-color: #4CAF50; /* CUSTOM CURSOR COLOR */
     }
-
     button {
       width: 100%;
       padding: 10px;
       background: #4CAF50;
-      border: none;
       color: white;
+      border: none;
       font-size: 16px;
-      border-radius: 4px;
       cursor: pointer;
+      border-radius: 6px;
     }
-
-    button:hover {
-      background: #45a049;
-    }
-
-    .switch {
+    .toggle-link {
+      margin-top: 10px;
       text-align: center;
-      margin-top: 15px;
     }
-
-    .switch a {
-      color: #007bff;
+    .toggle-link a {
       cursor: pointer;
+      color: #2e7d32;
+    }
+    .error {
+      color: red;
+      font-size: 14px;
     }
   </style>
 </head>
@@ -68,47 +58,77 @@
       <option value="user">User</option>
       <option value="admin">Admin</option>
     </select>
-    <input type="text" id="loginUsername" placeholder="Username" />
-    <input type="password" id="loginPassword" placeholder="Password" />
+    <input id="loginUsername" placeholder="Username" />
+    <input id="loginPassword" type="password" placeholder="Password" />
     <button onclick="login()">Login</button>
-    <div class="switch">
-      <p>No account? <a onclick="toggle(true)">Sign up</a></p>
+    <div class="toggle-link">
+      No account? <a onclick="toggle(true)">Sign Up</a>
     </div>
   </div>
 
   <div class="box" id="signupBox" style="display:none;">
     <h2>Sign Up</h2>
-    <input type="text" id="signupUsername" placeholder="New Username" />
-    <input type="password" id="signupPassword" placeholder="New Password" />
+    <input id="signupUsername" placeholder="New Username" />
+    <input id="signupPassword" type="password" placeholder="New Password" />
+    <p class="error" id="signupError"></p>
     <button onclick="signup()">Register</button>
-    <div class="switch">
-      <p>Already registered? <a onclick="toggle(false)">Login</a></p>
+    <div class="toggle-link">
+      Already have an account? <a onclick="toggle(false)">Login</a>
     </div>
   </div>
 
   <script>
-    function toggle(signup) {
-      document.getElementById('loginBox').style.display = signup ? 'none' : 'block';
-      document.getElementById('signupBox').style.display = signup ? 'block' : 'none';
+    const ADMIN_USERNAME = 'admin';
+    const ADMIN_PASSWORD = 'Admin@123';
+
+    function toggle(showSignup) {
+      document.getElementById('signupBox').style.display = showSignup ? 'block' : 'none';
+      document.getElementById('loginBox').style.display = showSignup ? 'none' : 'block';
     }
 
     async function login() {
+      const role = document.getElementById('role').value;
       const username = document.getElementById('loginUsername').value;
       const password = document.getElementById('loginPassword').value;
-      const role = document.getElementById('role').value;
+
+      if (role === 'admin') {
+        if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+          localStorage.setItem('username', 'admin');
+          localStorage.setItem('role', 'admin');
+          window.location.href = 'admin-dashboard.html';
+          return;
+        } else {
+          alert('Invalid admin credentials');
+          return;
+        }
+      }
 
       const res = await fetch('http://localhost:5000/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, role })
+        body: JSON.stringify({ username, password })
       });
       const data = await res.json();
-      alert(data.message);
+
+      if (data.success) {
+        localStorage.setItem('username', username);
+        localStorage.setItem('user_id', data.user_id);
+        window.location.href = 'dashboard.html';
+      } else {
+        alert(data.message);
+      }
     }
 
     async function signup() {
       const username = document.getElementById('signupUsername').value;
       const password = document.getElementById('signupPassword').value;
+      const errorEl = document.getElementById('signupError');
+
+      const valid = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
+      if (!valid) {
+        errorEl.textContent = 'Password must be 8+ chars with upper, lower, special char.';
+        return;
+      }
 
       const res = await fetch('http://localhost:5000/signup', {
         method: 'POST',
@@ -116,7 +136,13 @@
         body: JSON.stringify({ username, password })
       });
       const data = await res.json();
-      alert(data.message);
+
+      if (data.success) {
+        alert(data.message);
+        toggle(false);
+      } else {
+        errorEl.textContent = data.message;
+      }
     }
   </script>
 </body>
